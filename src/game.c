@@ -1,51 +1,54 @@
-//this example code shows how to put some text in nametable
-//it assumes that you have ASCII-encoded font in the CHR tiles $00-$3f
-
+//Move a pointer around all the screen
+//Change palette when pressing A or B
 #include "neslib.h"
 
+#define SCREEN_WIDTH    256
+#define SCREEN_HEIGHT   240
 
-//this macro is used remove need of calculation of the nametable address in runtime
+#define POINTER_SPRITE  0x41
+#define POINTER_SIZE    8
+#define POINTER_SPEED   2
 
-#define NTADR(x,y) ((0x2000|((y)<<5)|x))
+const unsigned char spritesPal[16] = {
+    0x0F, 0x11, 0x21, 0x31,
+    0x0F, 0x12, 0x22, 0x32,
+    0x0F, 0x13, 0x23, 0x33,
+    0x0F, 0x14, 0x24, 0x34
+};
 
-
-//put a string into the nametable
-
-void put_str(unsigned int adr,const char *str)
-{
-    vram_adr(adr);
-
-    while(1)
-    {
-        if(!*str) break;
-        vram_put((*str++)-0x20);//-0x20 because ASCII code 0x20 is placed in tile 0 of the CHR
-    }
-}
-
-
+static unsigned char x,y,pad,palette;
 
 void main(void)
 {
-    //rendering is disabled at the startup, and palette is all black
+    pal_spr(spritesPal);
+    ppu_on_all();
 
-    pal_col(1,0x30);//set while color
+    palette = x = y = 0;
 
-    //you can't put data into vram through vram_put while rendering is enabled
-    //so you have to disable rendering to put things like text or a level map
-    //into the nametable
+    while(1)
+    {
+        ppu_wait_frame();//wait for next TV frame
+        oam_spr(x, y, POINTER_SPRITE, palette & 3, 0);
 
-    //there is a way to update small number of nametable tiles while rendering
-    //is enabled, using set_vram_update and an update list
+        //Trigger for palette change
+        pad = pad_trigger(0);
 
-    put_str(NTADR(2,2),"HELLO, WORLD!");
-    put_str(NTADR(2,4),"THIS CODE PRINTS SOME TEXT");
-    put_str(NTADR(2,5),"USING ASCII-ENCODED CHARACTER");
-    put_str(NTADR(2,6),"SET WITH CAPITAL LETTERS ONLY");
-    put_str(NTADR(2,8),"TO USE CHR MORE EFFICIENTLY");
-    put_str(NTADR(2,9),"YOU'D NEED A CUSTOM ENCODING");
-    put_str(NTADR(2,10),"AND A CONVERSION TABLE");
+        //Converting if on & formula
+        // if (condition) {
+        //     x += t;
+        // }
+        // Can be expressed as:
+        // x += t & (0x0 - condition)
+        palette += 1 & (0x0 - ((pad & PAD_A) && 1));
+        palette -= 1 & (0x0 - ((pad & PAD_B) && 1));
 
-    ppu_on_all();//enable rendering
-
-    while(1);//do nothing, infinite loop
+        //Poll for arrow movement
+        pad = pad_poll(0);
+        
+        
+        x -= POINTER_SPEED & (0x0 - (pad & PAD_LEFT && x >= 2));
+        x += POINTER_SPEED & (0x0 - (pad & PAD_RIGHT && x < (SCREEN_WIDTH - POINTER_SIZE)));
+        y -= POINTER_SPEED & (0x0 - (pad & PAD_UP && y >= 2));
+        y += POINTER_SPEED & (0x0 - (pad & PAD_DOWN && y < (SCREEN_HEIGHT - POINTER_SIZE)));
+    }
 }
