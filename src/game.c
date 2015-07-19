@@ -42,10 +42,9 @@ void main(void)
         palette += 1 & (0x0 - ((pad & PAD_A) && 1));
         palette -= 1 & (0x0 - ((pad & PAD_B) && 1));
 
+
         //Poll for arrow movement
         pad = pad_poll(0);
-        
-        
         x -= POINTER_SPEED & (0x0 - (pad & PAD_LEFT && x >= 2));
         x += POINTER_SPEED & (0x0 - (pad & PAD_RIGHT && x < (SCREEN_WIDTH - POINTER_SIZE)));
         y -= POINTER_SPEED & (0x0 - (pad & PAD_UP && y >= 2));
