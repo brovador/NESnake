@@ -37,7 +37,7 @@
 ## Custom
 
 /build
-/samples
+/ext-samples
 *.nes
 
 
