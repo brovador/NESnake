@@ -12,11 +12,13 @@ clean:
 	@rm -fv game.o
 	@rm -fv ../build/game.nes
 	@rm -fv crt0.o
+	@rm -fv level.h
 
 crt0.o: crt0.s
 	ca65 crt0.s
 
 %.o: %.c
+	python ../tools/nam-to-c.py level.nam level.h
 	cc65 -Oi $< --add-source
 	ca65 $*.s
 	rm $*.s
