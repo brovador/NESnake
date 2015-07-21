@@ -1,24 +1,12 @@
+#include <conio.h>
 #include "neslib.h"
-
 #include "level.h"
 
-#define ATTRIBUTE_TABLE_A 0x23C0
 
+//LEVEL INFO
 #define SCREEN_WIDTH    256
 #define SCREEN_HEIGHT   240
-
-#define SNAKE_SPRITE_SIZE 8
-#define SNAKE_SPRITE    0x42
-#define SNAKE_PALETTE   0
-#define PILL_SPRITE     0x40
-#define PILL_PALETTE    1
-#define WALL_SPRITE     0x10
-#define WALL_PALETTE    1
-
-#define MAX_SNAKE_SIZE  20
-#define SNAKE_SPEED     2
-
-#define SnakeHead  snakeCoords[0]
+#define ATTRIBUTE_TABLE_A 0x23C0
 
 const unsigned char spritesPal[16] = {
     0x0F, 0x11, 0x21, 0x31,
@@ -34,14 +22,50 @@ const unsigned char bgPal[16] = {
     0x0F, 0x14, 0x24, 0x34
 };
 
-static unsigned char pad;
-static unsigned char gameover;
-static unsigned char i, x, y, dx, dy;
-
-static unsigned char snakeCoords[MAX_SNAKE_SIZE][2];
-static unsigned char snakeSize;
+const unsigned char levelBoundaries[4] = {
+    5 * 8, 5 * 8, 26 * 8, 24 * 8
+};
 
 static unsigned char levelNamRef[1024];
+
+
+
+//SNAKE INFO
+#define SNAKE_PALETTE   0
+#define SNAKE_SPRITE_SIZE 8
+#define SNAKE_SPRITE    0x42
+#define SNAKE_PALETTE   0
+#define MAX_SNAKE_SIZE  20
+#define SnakeHead       snakeCoords[0]
+
+static unsigned char    snakeCoords[MAX_SNAKE_SIZE][2];
+static unsigned char    snakeSpeed = 1;
+static unsigned char    snakeSize;
+
+
+
+// PILLS INFO
+#define PILL_SPRITE     0x41
+#define PILL_PALETTE    0
+#define MAX_PILLS       10
+
+static unsigned char pills = 0;
+static unsigned char pillsPositions[MAX_PILLS];
+
+static unsigned char pad;
+static unsigned char gameover;
+static unsigned char i, j, k, x, y;
+static unsigned char oamBuffer;
+
+void reset()
+{
+    snakeSize = 1;
+    SnakeHead[0] = SCREEN_WIDTH >> 1;
+    SnakeHead[1] = SCREEN_HEIGHT >> 1;
+    x = snakeSpeed;
+    y = 0;
+}
+
 
 void main(void)
 {
@@ -57,39 +81,61 @@ void main(void)
     oam_clear();
     ppu_on_all();
 
-    snakeSize = 1;
-    snakeCoords[snakeSize - 1][0] = SCREEN_WIDTH >> 1;
-    snakeCoords[snakeSize - 1][1] = SCREEN_HEIGHT >> 1;
-
-    dy = SNAKE_SPEED;
-    dx = 0;
-
-    
+    reset();
 
     while(1)
     {
         ppu_wait_frame();
+        oamBuffer = 0;
 
-        for (i = 0; i < snakeSize; i++) {
-            x = snakeCoords[i][0];
-            y = snakeCoords[i][1];
-            oam_spr(x, y, SNAKE_SPRITE, SNAKE_PALETTE, 0);
+        pad = pad_poll(0);
+        if ((pad & PAD_LEFT) && x != -snakeSpeed) {
+            x = -snakeSpeed;
+            y = 0;
+        } else if ((pad & PAD_RIGHT) && x != snakeSpeed) {
+            x = snakeSpeed;
+            y = 0;
+        } else if ((pad & PAD_UP) && y != -snakeSpeed) {
+            x = 0;
+            y = -snakeSpeed;
+        } else if ((pad & PAD_DOWN) && y != snakeSpeed) {
+            x = 0;
+            y = snakeSpeed;
         }
 
-        //Update snake body
-        
-        
         //Move head
-        SnakeHead[0] += dx;
-        SnakeHead[1] += dy;
+        SnakeHead[0] += x;
+        SnakeHead[1] += y;
 
-        gameover = gameover || (SnakeHead[0] == (SCREEN_WIDTH - SNAKE_SPRITE_SIZE));
-        gameover = gameover || (SnakeHead[1] == (SCREEN_HEIGHT - SNAKE_SPRITE_SIZE));
-
+        gameover = 0;
+        gameover = gameover || (SnakeHead[0] <= levelBoundaries[0]);
+        gameover = gameover || (SnakeHead[0] >= levelBoundaries[2]);
+        gameover = gameover || (SnakeHead[1] <= levelBoundaries[1]);
+        gameover = gameover || (SnakeHead[1] >= levelBoundaries[3]);
         if (gameover) {
-            dx = dy = 0;
+            reset();
         }
 
+
+        if (pills == 0) {
+            for (i = 0; i < 3; i++) {
+                j = rand8() % (levelBoundaries[2] - levelBoundaries[0]);
+                k = rand8() % (levelBoundaries[3] - levelBoundaries[1]);
+
+                oamBuffer = oam_spr(j + levelBoundaries[0], k + levelBoundaries[1], PILL_SPRITE, PILL_PALETTE, oamBuffer);
+               
+                pills++;
+            }
+        }
+
+        //Draw snake
+        for (i = 0; i < snakeSize; i++) {
+            oamBuffer = oam_spr(snakeCoords[i][0], snakeCoords[i][1], SNAKE_SPRITE, SNAKE_PALETTE, oamBuffer);
+        }
+
+        
+
+        
 
         //Check game over
         //READ VRAM AND CHECK IF THERE IS A SPRITE THERE
