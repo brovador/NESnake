@@ -19,9 +19,9 @@ crt0.o: crt0.s
 
 %.o: %.c
 	python ../tools/nam-to-c.py level.nam level.h
-	cc65 -Oi $< --add-source
+	cc65 -Oi $< --add-source 
 	ca65 $*.s
 	rm $*.s
 
 ../build/%.nes: %.o crt0.o
-	ld65 -C nes.cfg -o $@ crt0.o $< runtime.lib
+	ld65 -C nes.cfg -o $@ crt0.o $< runtime.lib c64.lib

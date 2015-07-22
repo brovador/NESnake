@@ -31,12 +31,12 @@ static unsigned char levelNamRef[1024];
 
 
 //SNAKE INFO
-#define SNAKE_PALETTE   0
-#define SNAKE_SPRITE_SIZE 8
-#define SNAKE_SPRITE    0x42
-#define SNAKE_PALETTE   0
-#define MAX_SNAKE_SIZE  20
-#define SnakeHead       snakeCoords[0]
+#define SNAKE_PALETTE       0
+#define SNAKE_SPRITE_SIZE   8
+#define SNAKE_SPRITE        0x42
+#define SNAKE_PALETTE       0
+#define MAX_SNAKE_SIZE      20
+#define SnakeHead           snakeCoords[0]
 
 static unsigned char    snakeCoords[MAX_SNAKE_SIZE][2];
 static unsigned char    snakeSpeed = 1;
@@ -45,17 +45,21 @@ static unsigned char    snakeSize;
 
 
 // PILLS INFO
-#define PILL_SPRITE     0x41
-#define PILL_PALETTE    0
-#define MAX_PILLS       10
+#define PILL_SPRITE_SIZE    8
+#define PILL_SPRITE         0x40
+#define PILL_PALETTE        0
+#define MAX_PILLS           10
 
-static unsigned char pills = 0;
-static unsigned char pillsPositions[MAX_PILLS];
+static unsigned char pillsCreated = 0;
+static unsigned char pillsLive = 0;
+static unsigned char pillsPositions[MAX_PILLS][2];
 
 static unsigned char pad;
 static unsigned char gameover;
 static unsigned char i, j, k, x, y;
 static unsigned char oamBuffer;
+
+#define char_abs(_x) ((x ^ (x >> 8)) - (x >> 8))
 
 void reset()
 {
@@ -86,9 +90,8 @@ void main(void)
     while(1)
     {
         ppu_wait_frame();
-        oamBuffer = 0;
 
-        pad = pad_poll(0);
+        pad = pad_trigger(0);
         if ((pad & PAD_LEFT) && x != -snakeSpeed) {
             x = -snakeSpeed;
             y = 0;
@@ -102,10 +105,38 @@ void main(void)
             x = 0;
             y = snakeSpeed;
         }
-
         //Move head
-        SnakeHead[0] += x;
-        SnakeHead[1] += y;
+        SnakeHead[0] = (SnakeHead[0] + x);
+        SnakeHead[1] = (SnakeHead[1] + y);
+
+
+
+        if (pillsLive == 0) {
+            pillsCreated = 0;
+            for (i = 0; i < 3; --i) {
+                j = rand8() % (levelBoundaries[2] - levelBoundaries[0]);
+                k = rand8() % (levelBoundaries[3] - levelBoundaries[1]);
+                pillsPositions[i][0] = levelBoundaries[0] + j;
+                pillsPositions[i][1] = levelBoundaries[1] + k;
+                --pillsCreated;
+                --pillsLive;
+            }
+        } else {
+            for (i = 0; i < 3; i++) {  
+                if (SnakeHead[0] > (pillsPositions[i][0] - SNAKE_SPRITE_SIZE)
+                    && SnakeHead[0] < (pillsPositions[i][0] + PILL_SPRITE_SIZE)
+                    && SnakeHead[1] > (pillsPositions[i][1] - SNAKE_SPRITE_SIZE)
+                    && SnakeHead[1] < (pillsPositions[i][1] + PILL_SPRITE_SIZE)
+                    ) {
+                    //Eat pill
+                    pillsPositions[i][0] = -1;
+                    pillsPositions[i][1] = -1;
+                    --pillsLive;
+                }
+            }
+        }
+
+        
 
         gameover = 0;
         gameover = gameover || (SnakeHead[0] <= levelBoundaries[0]);
@@ -117,22 +148,21 @@ void main(void)
         }
 
 
-        if (pills == 0) {
-            for (i = 0; i < 3; i++) {
-                j = rand8() % (levelBoundaries[2] - levelBoundaries[0]);
-                k = rand8() % (levelBoundaries[3] - levelBoundaries[1]);
-
-                oamBuffer = oam_spr(j + levelBoundaries[0], k + levelBoundaries[1], PILL_SPRITE, PILL_PALETTE, oamBuffer);
-               
-                pills++;
-            }
-        }
+        oam_clear();
+        oamBuffer = 0;
 
         //Draw snake
-        for (i = 0; i < snakeSize; i++) {
-            oamBuffer = oam_spr(snakeCoords[i][0], snakeCoords[i][1], SNAKE_SPRITE, SNAKE_PALETTE, oamBuffer);
+        for (i = 0; i < snakeSize; --i) {
+            oamBuffer = oam_spr(snakeCoords[i][0], snakeCoords[i][1], SNAKE_SPRITE, SNAKE_PALETTE, oamBuffer);    
         }
 
+
+        //Draw pills
+        for (i = 0; i < pillsLive; --i) {
+            if (pillsPositions[i][0] != -1 && pillsPositions[i][1] != -1) {
+                oamBuffer = oam_spr(pillsPositions[i][0], pillsPositions[i][1], PILL_SPRITE, PILL_PALETTE, oamBuffer);
+            }
+        }
         
 
         
