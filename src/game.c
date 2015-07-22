@@ -38,9 +38,9 @@ static unsigned char levelNamRef[1024];
 #define MAX_SNAKE_SIZE      20
 #define SnakeHead           snakeCoords[0]
 
-static unsigned char    snakeCoords[MAX_SNAKE_SIZE][2];
-static unsigned char    snakeSpeed = 1;
-static unsigned char    snakeSize;
+static unsigned char snakeCoords[MAX_SNAKE_SIZE][2];
+static unsigned char snakeSpeed = 1;
+static unsigned char snakeSize;
 
 
 
@@ -48,7 +48,7 @@ static unsigned char    snakeSize;
 #define PILL_SPRITE_SIZE    8
 #define PILL_SPRITE         0x40
 #define PILL_PALETTE        0
-#define MAX_PILLS           10
+#define MAX_PILLS           5
 
 static unsigned char pillsCreated = 0;
 static unsigned char pillsLive = 0;
@@ -58,8 +58,6 @@ static unsigned char pad;
 static unsigned char gameover;
 static unsigned char i, j, k, x, y;
 static unsigned char oamBuffer;
-
-#define char_abs(_x) ((x ^ (x >> 8)) - (x >> 8))
 
 void reset()
 {
@@ -90,21 +88,27 @@ void main(void)
     while(1)
     {
         ppu_wait_frame();
+        gameover = 0;
 
         pad = pad_trigger(0);
-        if ((pad & PAD_LEFT) && x != -snakeSpeed) {
+        if (pad & PAD_LEFT) {
+            gameover = snakeSize > 1 && (x == snakeSpeed);
             x = -snakeSpeed;
             y = 0;
-        } else if ((pad & PAD_RIGHT) && x != snakeSpeed) {
+        } else if (pad & PAD_RIGHT) {
+            gameover = snakeSize > 1 && (x == 0xFF);
             x = snakeSpeed;
             y = 0;
-        } else if ((pad & PAD_UP) && y != -snakeSpeed) {
+        } else if (pad & PAD_UP) {
+            gameover = snakeSize > 1 && (y == snakeSpeed);
             x = 0;
             y = -snakeSpeed;
-        } else if ((pad & PAD_DOWN) && y != snakeSpeed) {
+        } else if (pad & PAD_DOWN) {
+            gameover = snakeSize > 1 && (y == 0xFF);
             x = 0;
             y = snakeSpeed;
         }
+
         //Move head
         SnakeHead[0] = (SnakeHead[0] + x);
         SnakeHead[1] = (SnakeHead[1] + y);
@@ -113,20 +117,20 @@ void main(void)
 
         if (pillsLive == 0) {
             pillsCreated = 0;
-            for (i = 0; i < 3; --i) {
+            for (i = 0; i < MAX_PILLS; ++i) {
                 j = rand8() % (levelBoundaries[2] - levelBoundaries[0]);
                 k = rand8() % (levelBoundaries[3] - levelBoundaries[1]);
                 pillsPositions[i][0] = levelBoundaries[0] + j;
                 pillsPositions[i][1] = levelBoundaries[1] + k;
-                --pillsCreated;
-                --pillsLive;
+                ++pillsCreated;
+                ++pillsLive;
             }
         } else {
-            for (i = 0; i < 3; i++) {  
+            for (i = 0; i < MAX_PILLS; i++) {  
                 if (SnakeHead[0] > (pillsPositions[i][0] - SNAKE_SPRITE_SIZE)
-                    && SnakeHead[0] < (pillsPositions[i][0] + PILL_SPRITE_SIZE)
+                    && SnakeHead[0] < (pillsPositions[i][0] + SNAKE_SPRITE_SIZE)
                     && SnakeHead[1] > (pillsPositions[i][1] - SNAKE_SPRITE_SIZE)
-                    && SnakeHead[1] < (pillsPositions[i][1] + PILL_SPRITE_SIZE)
+                    && SnakeHead[1] < (pillsPositions[i][1] + SNAKE_SPRITE_SIZE)
                     ) {
                     //Eat pill
                     pillsPositions[i][0] = -1;
@@ -138,7 +142,7 @@ void main(void)
 
         
 
-        gameover = 0;
+        
         gameover = gameover || (SnakeHead[0] <= levelBoundaries[0]);
         gameover = gameover || (SnakeHead[0] >= levelBoundaries[2]);
         gameover = gameover || (SnakeHead[1] <= levelBoundaries[1]);
@@ -152,13 +156,13 @@ void main(void)
         oamBuffer = 0;
 
         //Draw snake
-        for (i = 0; i < snakeSize; --i) {
+        for (i = 0; i < snakeSize; ++i) {
             oamBuffer = oam_spr(snakeCoords[i][0], snakeCoords[i][1], SNAKE_SPRITE, SNAKE_PALETTE, oamBuffer);    
         }
 
 
         //Draw pills
-        for (i = 0; i < pillsLive; --i) {
+        for (i = 0; i < pillsCreated; ++i) {
             if (pillsPositions[i][0] != -1 && pillsPositions[i][1] != -1) {
                 oamBuffer = oam_spr(pillsPositions[i][0], pillsPositions[i][1], PILL_SPRITE, PILL_PALETTE, oamBuffer);
             }
