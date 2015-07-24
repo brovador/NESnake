@@ -23,23 +23,24 @@ const unsigned char bgPal[16] = {
 };
 
 const unsigned char levelBoundaries[4] = {
-    5 * 8, 5 * 8, 26 * 8, 24 * 8
+    8, 6, 23, 21
 };
 
 static unsigned char levelNamRef[1024];
 
 
+#define EMPTY_SPRITE        0x00
 
 //SNAKE INFO
 #define SNAKE_PALETTE       0
 #define SNAKE_SPRITE_SIZE   8
-#define SNAKE_SPRITE        0x42
+#define SNAKE_SPRITE        0x40
 #define SNAKE_PALETTE       0
-#define MAX_SNAKE_SIZE      50
+#define MAX_SNAKE_SIZE      35
 #define SnakeHead           snakeCoords[0]
 
 static unsigned char snakeCoords[MAX_SNAKE_SIZE][2];
-static unsigned char snakeSpeed = 8;
+static unsigned char snakeCleanCoords[2];
 static unsigned char snakeSize;
 static unsigned char x, y;
 
@@ -49,27 +50,78 @@ static unsigned char x, y;
 #define PILL_SPRITE_SIZE    8
 #define PILL_SPRITE         0x40
 #define PILL_PALETTE        0
-#define MAX_PILLS           5
+#define MAX_PILLS           8
 
-static unsigned char pillsCreated = 0;
 static unsigned char pillsLive = 0;
 static unsigned char pillsPositions[MAX_PILLS][2];
 
+
+// GAME INFO
+#define MAX_LEVEL 10
+const static unsigned char pillsPerLevel[MAX_LEVEL] = {
+    2, 2, 3, 3, 4, 4, 5, 6, 7, 8
+};
+const static unsigned char speed[MAX_LEVEL] = {
+    10, 10, 9, 9, 8, 8, 7, 6, 5, 4
+};  
+static unsigned char level = 0;
 static unsigned char pad;
 static unsigned char gameover;
-static unsigned char i, j, k, tmp, tmp2;
+static unsigned char i, j, k, l;
 static unsigned char oamBuffer;
 static unsigned char vFrameCount;
+
+static unsigned char snakeVramBuffer[MAX_SNAKE_SIZE * 3 + 1];
 
 void reset()
 {
     vFrameCount = 0;
     snakeSize = 1;
-    SnakeHead[0] = SCREEN_WIDTH >> 1;
-    SnakeHead[1] = SCREEN_HEIGHT >> 1;
-    x = snakeSpeed;
+    SnakeHead[0] = 16;
+    SnakeHead[1] = 15;
+    x = 1;
     y = 0;
+    level = -1;
+    pillsLive = 0;
 }
+
+
+void drawSnake()
+{
+    l = gameover ? EMPTY_SPRITE : SNAKE_SPRITE;
+    i = gameover ? 1 : 0;
+    for (i; i < snakeSize; ++i) {
+        j = snakeCoords[i][0];
+        k = snakeCoords[i][1];
+        snakeVramBuffer[i * 3 + 0] = MSB(NTADR_A(j, k));
+        snakeVramBuffer[i * 3 + 1] = LSB(NTADR_A(j, k));
+        snakeVramBuffer[i * 3 + 2] = l;    
+    }
+
+    //Clean empty zones
+    j = snakeCleanCoords[0];
+    k = snakeCleanCoords[1];
+    snakeVramBuffer[i * 3 + 0] = MSB(NTADR_A(j, k));
+    snakeVramBuffer[i * 3 + 1] = LSB(NTADR_A(j, k));
+    snakeVramBuffer[i * 3 + 2] = EMPTY_SPRITE;
+
+    snakeVramBuffer[(++i) * 3 + 0] = NT_UPD_EOF;
+
+    set_vram_update(snakeVramBuffer);
+}
+
+
+void growSnake()
+{
+    j = snakeSize;
+    ++snakeSize;
+    snakeSize = (snakeSize > MAX_SNAKE_SIZE - 1)? MAX_SNAKE_SIZE - 1 : snakeSize;
+    if (j != snakeSize) {
+        snakeCoords[snakeSize - 1][0] = snakeCoords[snakeSize - 2][0];
+        snakeCoords[snakeSize - 1][1] = snakeCoords[snakeSize - 2][1];
+    }
+}
+
 
 void main(void)
 {
@@ -81,7 +133,7 @@ void main(void)
     
     vram_adr(NAMETABLE_A);
     vram_write(levelNamRef, 1024);
-
+    
     oam_clear();
     ppu_on_all();
 
@@ -95,127 +147,93 @@ void main(void)
 
         pad = pad_trigger(0);
         if (pad & PAD_LEFT) {
-            gameover = snakeSize > 1 && (x == snakeSpeed);
-            x = -snakeSpeed;
+            gameover = snakeSize > 1 && (x == 1);
+            x = -1;
             y = 0;
         } else if (pad & PAD_RIGHT) {
             gameover = snakeSize > 1 && (x == 0xFF);
-            x = snakeSpeed;
+            x = 1;
             y = 0;
         } else if (pad & PAD_UP) {
-            gameover = snakeSize > 1 && (y == snakeSpeed);
+            gameover = snakeSize > 1 && (y == 1);
             x = 0;
-            y = -snakeSpeed;
+            y = -1;
         } else if (pad & PAD_DOWN) {
             gameover = snakeSize > 1 && (y == 0xFF);
             x = 0;
-            y = snakeSpeed;
+            y = 1;
+        } else if (pad & PAD_A) {
+            growSnake();
         }
 
-        
-        tmp2 = 0;
         if (pillsLive == 0) {
-            pillsCreated = 0;
-            for (i = 0; i < MAX_PILLS; ++i) {
+            ++level;
+            level = level > MAX_LEVEL ? MAX_LEVEL : level;
+            for (i = 0; i < pillsPerLevel[level]; ++i) {
                 j = rand8() % (levelBoundaries[2] - levelBoundaries[0]);
                 k = rand8() % (levelBoundaries[3] - levelBoundaries[1]);
                 pillsPositions[i][0] = levelBoundaries[0] + j;
                 pillsPositions[i][1] = levelBoundaries[1] + k;
-                ++pillsCreated;
                 ++pillsLive;
             }
         } else {
             for (i = 0; i < MAX_PILLS; i++) {  
-                if (SnakeHead[0] > (pillsPositions[i][0] - SNAKE_SPRITE_SIZE)
-                    && SnakeHead[0] < (pillsPositions[i][0] + SNAKE_SPRITE_SIZE)
-                    && SnakeHead[1] > (pillsPositions[i][1] - SNAKE_SPRITE_SIZE)
-                    && SnakeHead[1] < (pillsPositions[i][1] + SNAKE_SPRITE_SIZE)
-                    ) {
+                j = pillsPositions[i][0];
+                k = pillsPositions[i][1];
+                if (SnakeHead[0] == j && SnakeHead[1] == k) {
                     pillsPositions[i][0] = -1;
                     pillsPositions[i][1] = -1;
                     --pillsLive;
-
-                    tmp2 = 1;
-                    //Grow snake code
-                    tmp = snakeSize;
-                    ++snakeSize;
-                    snakeSize = (snakeSize > MAX_SNAKE_SIZE) ? MAX_SNAKE_SIZE : snakeSize;
-                    if (snakeSize != tmp) {
-                        snakeCoords[snakeSize - 1][0] = SnakeHead[0];
-                        snakeCoords[snakeSize - 1][1] = SnakeHead[1];
-                        SnakeHead[0] += x;
-                        SnakeHead[1] += y;    
-                    }
+                    growSnake();
                 }
             }
         }
 
         //Move snake
-        if (vFrameCount > snakeSpeed && tmp2 == 0) {
+        if (vFrameCount > speed[level]) {
             vFrameCount = 0;
+            
+            snakeCleanCoords[0] = snakeCoords[snakeSize - 1][0];
+            snakeCleanCoords[1] = snakeCoords[snakeSize - 1][1];
+            
             for (i = snakeSize - 1; i > 0; --i) {
                 snakeCoords[i][0] = snakeCoords[i-1][0];
                 snakeCoords[i][1] = snakeCoords[i-1][1];
             }
+            
             SnakeHead[0] += x;
             SnakeHead[1] += y;
         }
 
 
         //Check gameover
-        gameover = gameover || (SnakeHead[0] <= levelBoundaries[0]);
-        gameover = gameover || (SnakeHead[0] >= levelBoundaries[2]);
-        gameover = gameover || (SnakeHead[1] <= levelBoundaries[1]);
-        gameover = gameover || (SnakeHead[1] >= levelBoundaries[3]);
-        if (gameover) {
-            reset();
-        }
-
+        gameover = gameover || (SnakeHead[0] < levelBoundaries[0]);
+        gameover = gameover || (SnakeHead[0] > levelBoundaries[2]);
+        gameover = gameover || (SnakeHead[1] < levelBoundaries[1]);
+        gameover = gameover || (SnakeHead[1] > levelBoundaries[3]);
+        // if (snakeSize > 3) {
+        //     for (i = 3; i < snakeSize; i++) {
+        //         gameover = gameover || (snakeCoords[i][0] == SnakeHead[0]) &&  (snakeCoords[i][1] == SnakeHead[1]);
+        //         if (gameover) {
+        //             break;
+        //         }
+        //     }
+        // }
 
         oam_clear();
         oamBuffer = 0;
 
-        //Draw snake
-        for (i = 0; i < snakeSize; ++i) {
-            oamBuffer = oam_spr(snakeCoords[i][0], snakeCoords[i][1], SNAKE_SPRITE, SNAKE_PALETTE, oamBuffer);    
-        }
-
+        drawSnake();
 
         //Draw pills
-        for (i = 0; i < pillsCreated; ++i) {
+        for (i = 0; i < pillsPerLevel[level]; ++i) {
             if (pillsPositions[i][0] != -1 && pillsPositions[i][1] != -1) {
-                oamBuffer = oam_spr(pillsPositions[i][0], pillsPositions[i][1], PILL_SPRITE, PILL_PALETTE, oamBuffer);
+                oamBuffer = oam_spr(pillsPositions[i][0] * 8, pillsPositions[i][1] * 8, PILL_SPRITE, PILL_PALETTE, oamBuffer);
             }
         }
-        
 
-        
-
-        //Check game over
-        //READ VRAM AND CHECK IF THERE IS A SPRITE THERE
-
-
-        // ppu_wait_frame();//wait for next TV frame
-        // oam_spr(x, y, POINTER_SPRITE, palette & 3, 0);
-
-        // //Trigger for palette change
-        // pad = pad_trigger(0);
-
-        // //Converting if on & formula
-        // // if (condition) {
-        // //     x += t;
-        // // }
-        // // Can be expressed as:
-        // // x += t & (0x0 - condition)
-        // palette += 1 & (0x0 - ((pad & PAD_A) && 1));
-        // palette -= 1 & (0x0 - ((pad & PAD_B) && 1));
-
-
-        // //Poll for arrow movement
-        // pad = pad_poll(0);
-        // x -= POINTER_SPEED & (0x0 - (pad & PAD_LEFT && x >= 2));
-        // x += POINTER_SPEED & (0x0 - (pad & PAD_RIGHT && x < (SCREEN_WIDTH - POINTER_SIZE)));
-        // y -= POINTER_SPEED & (0x0 - (pad & PAD_UP && y >= 2));
-        // y += POINTER_SPEED & (0x0 - (pad & PAD_DOWN && y < (SCREEN_HEIGHT - POINTER_SIZE)));
+        if (gameover) {
+            reset();
+        }
     }
 }
