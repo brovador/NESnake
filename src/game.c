@@ -131,7 +131,9 @@ void enter()
     */
     reset();
     pad = pad_trigger(0);
-    if (pad & PAD_START) {
+    if ((pad & PAD_START)
+        || (pad & PAD_A)
+        || (pad & PAD_B)) {
         gameover = 0;
     }
 
