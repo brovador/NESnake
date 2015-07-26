@@ -9,17 +9,17 @@
 #define ATTRIBUTE_TABLE_A 0x23C0
 
 const unsigned char spritesPal[16] = {
-    0x0F, 0x11, 0x21, 0x31,
-    0x0F, 0x12, 0x22, 0x32,
-    0x0F, 0x13, 0x23, 0x33,
-    0x0F, 0x14, 0x24, 0x34
+    0x0C, 0x25, 0x24, 0x34,
+    0x0C, 0x19, 0x29, 0x39,
+    0x0C, 0x1C, 0x2C, 0x3C,
+    0x0C, 0x14, 0x24, 0x34
 };
 
 const unsigned char bgPal[16] = {
-    0x0F, 0x25, 0x24, 0x34,
-    0x0F, 0x2A, 0x22, 0x32,
-    0x0F, 0x13, 0x23, 0x33,
-    0x0F, 0x14, 0x24, 0x34
+    0x0C, 0x25, 0x24, 0x34,
+    0x0C, 0x19, 0x29, 0x39,
+    0x0C, 0x1C, 0x2C, 0x3C,
+    0x0C, 0x14, 0x24, 0x34
 };
 
 const unsigned char levelBoundaries[4] = {
@@ -32,10 +32,8 @@ static unsigned char levelNamRef[1024];
 #define EMPTY_SPRITE        0x00
 
 //SNAKE INFO
-#define SNAKE_PALETTE       0
 #define SNAKE_SPRITE_SIZE   8
 #define SNAKE_SPRITE        0x40
-#define SNAKE_PALETTE       0
 #define MAX_SNAKE_SIZE      35
 #define SnakeHead           snakeCoords[0]
 
@@ -48,8 +46,8 @@ static unsigned char x, y;
 
 // PILLS INFO
 #define PILL_SPRITE_SIZE    8
-#define PILL_SPRITE         0x40
-#define PILL_PALETTE        0
+#define PILL_SPRITE         0x45
+#define PILL_PALETTE        2
 #define MAX_PILLS           8
 
 static unsigned char pillsLive = 0;
@@ -113,13 +111,7 @@ void drawSnake()
 
 void growSnake()
 {
-    j = snakeSize;
-    ++snakeSize;
-    snakeSize = (snakeSize > MAX_SNAKE_SIZE - 1)? MAX_SNAKE_SIZE - 1 : snakeSize;
-    if (j != snakeSize) {
-        snakeCoords[snakeSize - 1][0] = snakeCoords[snakeSize - 2][0];
-        snakeCoords[snakeSize - 1][1] = snakeCoords[snakeSize - 2][1];
-    }
+    
 }
 
 
@@ -162,8 +154,6 @@ void main(void)
             gameover = snakeSize > 1 && (y == 0xFF);
             x = 0;
             y = 1;
-        } else if (pad & PAD_A) {
-            growSnake();
         }
 
         if (pillsLive == 0) {
@@ -184,7 +174,15 @@ void main(void)
                     pillsPositions[i][0] = -1;
                     pillsPositions[i][1] = -1;
                     --pillsLive;
-                    growSnake();
+                    
+                    //Grow snake
+                    j = snakeSize;
+                    ++snakeSize;
+                    snakeSize = (snakeSize > MAX_SNAKE_SIZE - 1)? MAX_SNAKE_SIZE - 1 : snakeSize;
+                    if (j != snakeSize) {
+                        snakeCoords[snakeSize - 1][0] = snakeCoords[snakeSize - 2][0];
+                        snakeCoords[snakeSize - 1][1] = snakeCoords[snakeSize - 2][1];
+                    }
                 }
             }
         }
@@ -211,14 +209,12 @@ void main(void)
         gameover = gameover || (SnakeHead[0] > levelBoundaries[2]);
         gameover = gameover || (SnakeHead[1] < levelBoundaries[1]);
         gameover = gameover || (SnakeHead[1] > levelBoundaries[3]);
-        // if (snakeSize > 3) {
-        //     for (i = 3; i < snakeSize; i++) {
-        //         gameover = gameover || (snakeCoords[i][0] == SnakeHead[0]) &&  (snakeCoords[i][1] == SnakeHead[1]);
-        //         if (gameover) {
-        //             break;
-        //         }
-        //     }
-        // }
+        for (i = 2; i < snakeSize; i++) {
+            gameover = gameover || (snakeCoords[i][0] == SnakeHead[0] &&  snakeCoords[i][1] == SnakeHead[1]);
+            if (gameover) {
+                break;
+            }
+        }
 
         oam_clear();
         oamBuffer = 0;
