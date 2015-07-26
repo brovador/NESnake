@@ -56,16 +56,32 @@ static unsigned char pillsPositions[MAX_PILLS][2];
 
 // GAME INFO
 #define MAX_LEVEL 10
+
+#define SCORE_PALETTE   0
+#define SCORE_X_COORDS  8 * 21
+#define SCORE_Y_COORDS  8 * 3
+
+#define LEVEL_PALETTE   0
+#define LEVEL_X_COORDS  8 * 18
+#define LEVEL_Y_COORDSS  8 * 24
+
+const static unsigned char pointsPerLevel[MAX_LEVEL] = {
+    2, 5, 10, 20, 30, 40, 50, 100, 200, 500
+};
+
 const static unsigned char pillsPerLevel[MAX_LEVEL] = {
     2, 2, 3, 3, 4, 4, 5, 6, 7, 8
 };
 const static unsigned char speed[MAX_LEVEL] = {
     15, 12, 10, 9, 8, 8, 7, 6, 5, 4
 };  
+static unsigned int score = 0;
+static unsigned char scoreParts[4];
+
 static unsigned char level = 0;
 static unsigned char pad;
 static unsigned char gameover;
-static unsigned char i, j, k, l;
+static unsigned char i, j, k, l, m;
 static unsigned char oamBuffer;
 static unsigned char vFrameCount;
 static unsigned char snakeVramBuffer[MAX_SNAKE_SIZE * 3 + 1];
@@ -80,6 +96,7 @@ void reset()
     y = 0;
     level = -1;
     pillsLive = 0;
+    score = 0;
 }
 
 
@@ -132,6 +149,7 @@ void main(void)
         GAMELOOP CODE
         **/
 
+        //Spawn pills
         if (pillsLive == 0) {
             ++level;
             level = level > MAX_LEVEL ? MAX_LEVEL : level;
@@ -142,6 +160,7 @@ void main(void)
                 pillsPositions[i][1] = levelBoundaries[1] + k;
                 ++pillsLive;
             }
+        //Eat pill
         } else {
             for (i = 0; i < MAX_PILLS; i++) {  
                 j = pillsPositions[i][0];
@@ -159,6 +178,11 @@ void main(void)
                         snakeCoords[snakeSize - 1][0] = snakeCoords[snakeSize - 2][0];
                         snakeCoords[snakeSize - 1][1] = snakeCoords[snakeSize - 2][1];
                     }
+                    score += pointsPerLevel[level];
+                    scoreParts[0] = score / 1000;
+                    scoreParts[1] = score / 100 - scoreParts[0] * 10;
+                    scoreParts[2] = score / 10 - (scoreParts[0] * 100 + scoreParts[1] * 10);
+                    scoreParts[3] = score - (scoreParts[0] * 1000 + scoreParts[1] * 100 + scoreParts[2] * 10);
                 }
             }
         }
@@ -227,6 +251,18 @@ void main(void)
                 oamBuffer = oam_spr(pillsPositions[i][0] * 8, pillsPositions[i][1] * 8, PILL_SPRITE, PILL_PALETTE, oamBuffer);
             }
         }
+
+        //Draw score
+        oamBuffer = oam_spr(SCORE_X_COORDS, SCORE_Y_COORDS, 0x10 + scoreParts[0], SCORE_PALETTE, oamBuffer);
+        oamBuffer = oam_spr(SCORE_X_COORDS + 8, SCORE_Y_COORDS, 0x10 + scoreParts[1], SCORE_PALETTE, oamBuffer);
+        oamBuffer = oam_spr(SCORE_X_COORDS + 16, SCORE_Y_COORDS, 0x10 + scoreParts[2], SCORE_PALETTE, oamBuffer);
+        oamBuffer = oam_spr(SCORE_X_COORDS + 24, SCORE_Y_COORDS, 0x10 + scoreParts[3], SCORE_PALETTE, oamBuffer);
+
+        //Draw level
+        i = (level + 1) / 10;
+        j = (level + 1) - i * 10;
+        oamBuffer = oam_spr(LEVEL_X_COORDS, LEVEL_Y_COORDSS, 0x10 + i, LEVEL_PALETTE, oamBuffer);
+        oamBuffer = oam_spr(LEVEL_X_COORDS + 8, LEVEL_Y_COORDSS, 0x10 + j, LEVEL_PALETTE, oamBuffer);
 
 
         if (gameover) {
