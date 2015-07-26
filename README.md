@@ -4,4 +4,4 @@ Simple port of the Snake game written in C for the Nintendo Entertainment System
 
 # Build
 
-Makefile included: ```make all``.
+Makefile included: ```make all```.
