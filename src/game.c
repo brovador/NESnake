@@ -60,7 +60,7 @@ const static unsigned char pillsPerLevel[MAX_LEVEL] = {
     2, 2, 3, 3, 4, 4, 5, 6, 7, 8
 };
 const static unsigned char speed[MAX_LEVEL] = {
-    10, 10, 9, 9, 8, 8, 7, 6, 5, 4
+    15, 12, 10, 9, 8, 8, 7, 6, 5, 4
 };  
 static unsigned char level = 0;
 static unsigned char pad;
@@ -68,7 +68,6 @@ static unsigned char gameover;
 static unsigned char i, j, k, l;
 static unsigned char oamBuffer;
 static unsigned char vFrameCount;
-
 static unsigned char snakeVramBuffer[MAX_SNAKE_SIZE * 3 + 1];
 
 void reset()
@@ -81,37 +80,6 @@ void reset()
     y = 0;
     level = -1;
     pillsLive = 0;
-}
-
-
-void drawSnake()
-{
-    l = gameover ? EMPTY_SPRITE : SNAKE_SPRITE;
-    i = gameover ? 1 : 0;
-    for (i; i < snakeSize; ++i) {
-        j = snakeCoords[i][0];
-        k = snakeCoords[i][1];
-        snakeVramBuffer[i * 3 + 0] = MSB(NTADR_A(j, k));
-        snakeVramBuffer[i * 3 + 1] = LSB(NTADR_A(j, k));
-        snakeVramBuffer[i * 3 + 2] = l;    
-    }
-
-    //Clean empty zones
-    j = snakeCleanCoords[0];
-    k = snakeCleanCoords[1];
-    snakeVramBuffer[i * 3 + 0] = MSB(NTADR_A(j, k));
-    snakeVramBuffer[i * 3 + 1] = LSB(NTADR_A(j, k));
-    snakeVramBuffer[i * 3 + 2] = EMPTY_SPRITE;
-
-    snakeVramBuffer[(++i) * 3 + 0] = NT_UPD_EOF;
-
-    set_vram_update(snakeVramBuffer);
-}
-
-
-void growSnake()
-{
-    
 }
 
 
@@ -137,6 +105,10 @@ void main(void)
         gameover = 0;
         vFrameCount++;
 
+        /*
+        INPUT CONTROL
+        */
+
         pad = pad_trigger(0);
         if (pad & PAD_LEFT) {
             gameover = snakeSize > 1 && (x == 1);
@@ -155,6 +127,10 @@ void main(void)
             x = 0;
             y = 1;
         }
+
+        /**
+        GAMELOOP CODE
+        **/
 
         if (pillsLive == 0) {
             ++level;
@@ -188,9 +164,8 @@ void main(void)
         }
 
         //Move snake
-        if (vFrameCount > speed[level]) {
-            vFrameCount = 0;
-            
+        i = vFrameCount / speed[level] * speed[level];
+        if (i == vFrameCount) {
             snakeCleanCoords[0] = snakeCoords[snakeSize - 1][0];
             snakeCleanCoords[1] = snakeCoords[snakeSize - 1][1];
             
@@ -216,10 +191,35 @@ void main(void)
             }
         }
 
+        /***
+        DRAW CODE
+        **/
+
         oam_clear();
         oamBuffer = 0;
 
-        drawSnake();
+        //Draw snake code
+        l = gameover ? EMPTY_SPRITE : SNAKE_SPRITE;
+        i = gameover ? 1 : 0;
+        for (i; i < snakeSize; ++i) {
+            j = snakeCoords[i][0];
+            k = snakeCoords[i][1];
+            snakeVramBuffer[i * 3 + 0] = MSB(NTADR_A(j, k));
+            snakeVramBuffer[i * 3 + 1] = LSB(NTADR_A(j, k));
+            snakeVramBuffer[i * 3 + 2] = l;    
+        }
+
+        //Clean empty zones
+        j = snakeCleanCoords[0];
+        k = snakeCleanCoords[1];
+        snakeVramBuffer[i * 3 + 0] = MSB(NTADR_A(j, k));
+        snakeVramBuffer[i * 3 + 1] = LSB(NTADR_A(j, k));
+        snakeVramBuffer[i * 3 + 2] = EMPTY_SPRITE;
+
+        snakeVramBuffer[(++i) * 3 + 0] = NT_UPD_EOF;
+
+        set_vram_update(snakeVramBuffer);
+
 
         //Draw pills
         for (i = 0; i < pillsPerLevel[level]; ++i) {
@@ -227,6 +227,7 @@ void main(void)
                 oamBuffer = oam_spr(pillsPositions[i][0] * 8, pillsPositions[i][1] * 8, PILL_SPRITE, PILL_PALETTE, oamBuffer);
             }
         }
+
 
         if (gameover) {
             reset();
